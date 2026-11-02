@@ -41,17 +41,28 @@ h1 b{color:var(--gold)}
 .site{padding:0 16px 12px;font-size:13px;color:var(--mute)}
 .msg{text-align:center;color:#9fb0cc;padding:40px 10px}
 .warn{font-size:12px;color:#8393b0;text-align:center;margin-top:20px}
+.stat strong{font-size:20px}
+.day{font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:#9fb0cc;margin:20px 2px 10px;font-weight:700}
+.slip{border-left:5px solid #b9c4d6}.slip.win{border-left-color:var(--win)}.slip.lose{border-left-color:var(--lose)}.slip.wait{border-left-color:var(--wait)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.score{background:#dfe6f1;border-radius:8px;padding:3px 9px;font-weight:700;font-size:14px;white-space:nowrap}
+.res{margin:8px 16px 4px;padding:9px 12px;border-radius:10px;display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.res.win{background:#dff3e8;color:#14683f}.res.lose{background:#fbe3e4;color:#9b2a2f}.res.wait{background:#f6ecd7;color:#8a5a0c}
+.foot{flex-wrap:wrap}.acts{display:flex;gap:8px}
+.share{border:1px solid #b9c4d6;background:none;color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px}
+#upd{font-size:12px;color:#7d8ea9;margin-top:2px}
 </style>
 </head>
 <body>
 <header>
   <h1><img class="logo" src="logo.png" alt="ezWinner" onload="this.nextElementSibling.hidden=true" onerror="this.remove()"><span>ez<b>Winner</b></span></h1>
   <div class="sub">Pronostics et Betcodes du jour</div>
+  <div id="upd"></div>
 </header>
 <div class="stats" id="stats"></div>
 <div class="tabs" id="tabs"></div>
 <main id="list"><div class="msg">Chargement des pronostics…</div></main>
-<p class="warn">Les paris comportent des risques. Joue avec modération, 18 ans et plus.</p>
+<p class="warn">Les pronostics ne garantissent aucun gain. Les paris comportent des risques : joue avec modération, 18 ans et plus.</p>
 
 <script>
 // Lien de ton Google Sheet publié (CSV)
@@ -110,7 +121,7 @@ function renderStats(){
   const l = tickets.filter(t => t.etat === "lose").length;
   const rate = (w + l) ? Math.round(100 * w / (w + l)) + " %" : "–";
   const box = $("stats"); box.innerHTML = "";
-  [[rate, "Réussite"], [w, "Gagnés"], [l, "Perdus"]].forEach(([v, k]) => {
+  [[rate, "Réussite"], [w, "Gagnés"], [l, "Perdus"], [tickets.length, "Tickets"]].forEach(([v, k]) => {
     const s = el("div", "stat"); s.append(el("strong", "", v), el("span", "", k)); box.appendChild(s);
   });
 }
@@ -124,25 +135,51 @@ function renderTabs(){
   });
 }
 
+function dayLabel(d){
+  const x = new Date(d + "T00:00:00");
+  if(isNaN(x)) return d || "Sans date";
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const diff = Math.round((x - t) / 864e5);
+  if(diff === 0) return "Aujourd’hui";
+  if(diff === 1) return "Demain";
+  if(diff === -1) return "Hier";
+  return x.toLocaleDateString("fr-FR", {weekday:"long", day:"numeric", month:"long"});
+}
+
+async function partager(t, ms, b){
+  const txt = "ezWinner\n" + ms.map(m => m[0] + " → " + m[1]).join("\n") + "\nCote : " + (t.cote || "–") + (t.betcode ? "\nBetcode : " + t.betcode + (t.site ? " (" + t.site + ")" : "") : "") + "\n" + location.href.split("#")[0];
+  try {
+    if(navigator.share) await navigator.share({title:"ezWinner", text:txt});
+    else { await navigator.clipboard.writeText(txt); b.textContent = "Copié ✓"; setTimeout(() => b.textContent = "Partager", 1800); }
+  } catch(e){}
+}
+
 function renderList(){
   const box = $("list"); box.innerHTML = "";
   const items = tickets.filter(t => filtre === "all" || t.etat === filtre);
   if(!items.length){ box.appendChild(el("div", "msg", "Aucun ticket dans cette catégorie pour le moment.")); return; }
+  let last = null;
   items.forEach(t => {
-    const s = el("article", "slip");
-    const top = el("div", "top"); top.append(el("span", "", fmtDate(t.date)), el("span", "badge " + t.etat, LABELS[t.etat]));
+    if(t.date !== last){ last = t.date; box.appendChild(el("h2", "day", dayLabel(t.date))); }
+    const ms = [];
+    for(let n = 1; n <= 20; n++) if(t["match" + n]) ms.push([t["match" + n], t["prono" + n] || "–", t["score" + n] || ""]);
+    const s = el("article", "slip " + t.etat);
+    const top = el("div", "top");
+    top.append(el("span", "", ms.length > 1 ? "Combiné · " + ms.length + " matchs" : "Simple"), el("span", "badge " + t.etat, LABELS[t.etat]));
     s.appendChild(top);
-    Array.from({length:20}, (_, i) => i + 1).forEach(n => {
-      if(!t["match" + n]) return;
-      const r = el("div", "row");
-      r.append(el("small", "", t["match" + n]));
-      const p = el("strong"); p.appendChild(el("em", "", t["prono" + n] || "–")); r.appendChild(p);
+    ms.forEach(m => {
+      const r = el("div", "row"), l = el("div", "l");
+      l.append(el("small", "", m[0]), el("strong", "", m[1]));
+      r.appendChild(l);
+      if(m[2]) r.appendChild(el("span", "score", m[2]));
       s.appendChild(r);
     });
+    if(t.resultat){ const r = el("div", "res " + t.etat); r.append(el("span", "", "Résultat"), el("b", "", t.resultat)); s.appendChild(r); }
     s.appendChild(el("div", "cut"));
     const f = el("div", "foot");
     const c = el("div", "cote"); c.append(el("span", "", "Cote totale"), el("b", "", t.cote || "–"));
-    f.appendChild(c);
+    const a = el("div", "acts");
+    const sh = el("button", "share", "Partager"); sh.onclick = () => partager(t, ms, sh); a.appendChild(sh);
     if(t.betcode){
       const b = el("button", "code"); b.append(el("span", "", "Betcode · toucher pour copier"), el("b", "", t.betcode));
       b.onclick = async () => {
@@ -150,9 +187,9 @@ function renderList(){
         catch(e){ b.firstChild.textContent = "Copie impossible, note le code"; }
         setTimeout(() => b.firstChild.textContent = "Betcode · toucher pour copier", 1800);
       };
-      f.appendChild(b);
+      a.appendChild(b);
     }
-    s.appendChild(f);
+    f.append(c, a); s.appendChild(f);
     if(t.site) s.appendChild(el("div", "site", "À jouer sur " + t.site));
     box.appendChild(s);
   });
@@ -164,6 +201,7 @@ async function load(){
     const r = await fetch(CSV_URL + "&t=" + Date.now());
     if(!r.ok) throw new Error(r.status);
     csv = await r.text();
+    $("upd").textContent = "Mis à jour à " + new Date().toLocaleTimeString("fr-FR", {hour:"2-digit", minute:"2-digit"});
     try { localStorage.setItem("ezw_csv", csv); } catch(e){}
   } catch(e){
     try { csv = localStorage.getItem("ezw_csv"); } catch(e2){}
