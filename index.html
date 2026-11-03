@@ -51,6 +51,9 @@ h1 b{color:var(--gold)}
 .foot{flex-wrap:wrap}.acts{display:flex;gap:8px}
 .share{border:1px solid #b9c4d6;background:none;color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px}
 #upd{font-size:12px;color:#7d8ea9;margin-top:2px}
+.sections{display:flex;background:var(--bg2);border-radius:12px;padding:4px;margin:12px 0}
+.sections button{flex:1;border:0;background:none;color:#9fb0cc;padding:9px;border-radius:9px;font:inherit;font-weight:700}
+.sections button.on{background:var(--gold);color:#14213d}
 </style>
 </head>
 <body>
@@ -59,6 +62,7 @@ h1 b{color:var(--gold)}
   <div class="sub">Pronostics et Betcodes du jour</div>
   <div id="upd"></div>
 </header>
+<div class="sections" id="sections"></div>
 <div class="stats" id="stats"></div>
 <div class="tabs" id="tabs"></div>
 <main id="list"><div class="msg">Chargement des pronostics…</div></main>
@@ -108,7 +112,9 @@ function toTickets(csv){
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }
 
-let tickets = [], filtre = "all";
+let tickets = [], filtre = "all", section = "pronos";
+const isM = t => (t.type || "").toLowerCase().startsWith("montan");
+const sectionTickets = () => tickets.filter(t => isM(t) === (section === "montantes"));
 const LABELS = {win:"Gagné", lose:"Perdu", wait:"En cours"};
 
 function fmtDate(d){
@@ -117,12 +123,22 @@ function fmtDate(d){
 }
 
 function renderStats(){
-  const w = tickets.filter(t => t.etat === "win").length;
-  const l = tickets.filter(t => t.etat === "lose").length;
+  const T = sectionTickets();
+  const w = T.filter(t => t.etat === "win").length;
+  const l = T.filter(t => t.etat === "lose").length;
   const rate = (w + l) ? Math.round(100 * w / (w + l)) + " %" : "–";
   const box = $("stats"); box.innerHTML = "";
-  [[rate, "Réussite"], [w, "Gagnés"], [l, "Perdus"], [tickets.length, "Tickets"]].forEach(([v, k]) => {
+  [[rate, "Réussite"], [w, "Gagnés"], [l, "Perdus"], [T.length, "Tickets"]].forEach(([v, k]) => {
     const s = el("div", "stat"); s.append(el("strong", "", v), el("span", "", k)); box.appendChild(s);
+  });
+}
+
+function renderSections(){
+  const box = $("sections"); box.innerHTML = "";
+  [["pronos","Pronostics"],["montantes","Montantes"]].forEach(([k, n]) => {
+    const b = el("button", k === section ? "on" : "", n);
+    b.onclick = () => { section = k; filtre = "all"; renderSections(); renderStats(); renderTabs(); renderList(); };
+    box.appendChild(b);
   });
 }
 
@@ -156,7 +172,8 @@ async function partager(t, ms, b){
 
 function renderList(){
   const box = $("list"); box.innerHTML = "";
-  const items = tickets.filter(t => filtre === "all" || t.etat === filtre);
+  const items = sectionTickets().filter(t => filtre === "all" || t.etat === filtre);
+  if(section === "montantes") items.sort((a, b) => (b.date || "").localeCompare(a.date || "") || (parseFloat(a.cote) || 0) - (parseFloat(b.cote) || 0));
   if(!items.length){ box.appendChild(el("div", "msg", "Aucun ticket dans cette catégorie pour le moment.")); return; }
   let last = null;
   items.forEach(t => {
@@ -165,7 +182,7 @@ function renderList(){
     for(let n = 1; n <= 20; n++) if(t["match" + n]) ms.push([t["match" + n], t["prono" + n] || "–", t["score" + n] || ""]);
     const s = el("article", "slip " + t.etat);
     const top = el("div", "top");
-    top.append(el("span", "", ms.length > 1 ? "Combiné · " + ms.length + " matchs" : "Simple"), el("span", "badge " + t.etat, LABELS[t.etat]));
+    top.append(el("span", "", isM(t) ? "Montante · " + (t.palier || "Cote " + (t.cote || "?")) : (ms.length > 1 ? "Combiné · " + ms.length + " matchs" : "Simple")), el("span", "badge " + t.etat, LABELS[t.etat]));
     s.appendChild(top);
     ms.forEach(m => {
       const r = el("div", "row"), l = el("div", "l");
@@ -208,7 +225,7 @@ async function load(){
   }
   if(csv === null){ $("list").innerHTML = ""; $("list").appendChild(el("div", "msg", "Impossible de charger les pronostics. Vérifie ta connexion et réessaie.")); return; }
   tickets = toTickets(csv);
-  renderStats(); renderTabs(); renderList();
+  renderSections(); renderStats(); renderTabs(); renderList();
 }
 load();
 setInterval(load, 120000);
