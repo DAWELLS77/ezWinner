@@ -51,8 +51,8 @@ h1 b{color:var(--gold)}
 .foot{flex-wrap:wrap}.acts{display:flex;gap:8px}
 .share{border:1px solid #b9c4d6;background:none;color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px}
 #upd{font-size:12px;color:#7d8ea9;margin-top:2px}
-.sections{display:flex;background:var(--bg2);border-radius:12px;padding:4px;margin:12px 0}
-.sections button{flex:1;border:0;background:none;color:#9fb0cc;padding:9px;border-radius:9px;font:inherit;font-weight:700}
+.sections{display:flex;gap:2px;overflow-x:auto;background:var(--bg2);border-radius:12px;padding:4px;margin:12px 0}
+.sections button{flex:1 0 auto;border:0;background:none;color:#9fb0cc;padding:9px 12px;border-radius:9px;font:inherit;font-size:14px;font-weight:700;white-space:nowrap}
 .sections button.on{background:var(--gold);color:#14213d}
 </style>
 </head>
@@ -114,7 +114,21 @@ function toTickets(csv){
 
 let tickets = [], filtre = "all", section = "pronos";
 const isM = t => (t.type || "").toLowerCase().startsWith("montan");
-const sectionTickets = () => tickets.filter(t => isM(t) === (section === "montantes"));
+const NBA_RE = /\b(nba|hawks|celtics|nets|hornets|bulls|cavaliers|cavs|mavericks|mavs|nuggets|pistons|warriors|rockets|pacers|clippers|lakers|grizzlies|heat|bucks|timberwolves|wolves|pelicans|knicks|thunder|magic|76ers|sixers|suns|blazers|trail blazers|raptors|jazz|wizards|san antonio|sacramento kings)\b/i;
+const SCORE_RE = /^\s*\d{1,2}\s*[-:–]\s*\d{1,2}\s*$/;
+const kind = t => {
+  const y = (t.type || "").toLowerCase().replace(/[^a-z]/g, "");
+  if(y.startsWith("montan")) return "montantes";
+  if(y === "nba") return "nba";
+  if(y.startsWith("correct") || y.startsWith("score")) return "score";
+  if(t.palier) return "montantes";
+  const ms = [], pr = [];
+  for(let n = 1; n <= 20; n++){ if(t["match" + n]) ms.push(t["match" + n]); if(t["prono" + n]) pr.push(t["prono" + n]); }
+  if(ms.length && ms.every(m => NBA_RE.test(m))) return "nba";
+  if(pr.length && pr.every(p => SCORE_RE.test(p))) return "score";
+  return "pronos";
+};
+const sectionTickets = () => tickets.filter(t => kind(t) === section);
 const LABELS = {win:"Gagné", lose:"Perdu", wait:"En cours"};
 
 function fmtDate(d){
@@ -135,7 +149,7 @@ function renderStats(){
 
 function renderSections(){
   const box = $("sections"); box.innerHTML = "";
-  [["pronos","Pronostics"],["montantes","Montantes"]].forEach(([k, n]) => {
+  [["pronos","Pronostics"],["montantes","Montantes"],["nba","NBA"],["score","Correct score"]].forEach(([k, n]) => {
     const b = el("button", k === section ? "on" : "", n);
     b.onclick = () => { section = k; filtre = "all"; renderSections(); renderStats(); renderTabs(); renderList(); };
     box.appendChild(b);
@@ -182,7 +196,7 @@ function renderList(){
     for(let n = 1; n <= 20; n++) if(t["match" + n]) ms.push([t["match" + n], t["prono" + n] || "–", t["score" + n] || ""]);
     const s = el("article", "slip " + t.etat);
     const top = el("div", "top");
-    top.append(el("span", "", isM(t) ? "Montante · " + (t.palier || "Cote " + (t.cote || "?")) : (ms.length > 1 ? "Combiné · " + ms.length + " matchs" : "Simple")), el("span", "badge " + t.etat, LABELS[t.etat]));
+    top.append(el("span", "", isM(t) ? "Montante · " + (t.palier || "Cote " + (t.cote || "?")) : kind(t) === "nba" ? "NBA" : kind(t) === "score" ? "Correct score" : (ms.length > 1 ? "Combiné · " + ms.length + " matchs" : "Simple")), el("span", "badge " + t.etat, LABELS[t.etat]));
     s.appendChild(top);
     ms.forEach(m => {
       const r = el("div", "row"), l = el("div", "l");
