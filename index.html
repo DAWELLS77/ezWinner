@@ -54,6 +54,30 @@ h1 b{color:var(--gold)}
 .sections{display:flex;gap:2px;overflow-x:auto;background:var(--bg2);border-radius:12px;padding:4px;margin:12px 0}
 .sections button{flex:1 0 auto;border:0;background:none;color:#9fb0cc;padding:9px 12px;border-radius:9px;font:inherit;font-size:14px;font-weight:700;white-space:nowrap}
 .sections button.on{background:var(--gold);color:#14213d}
+body{background:radial-gradient(900px 420px at 50% -160px,#27407a 0,transparent 70%),#0d1424;background-attachment:fixed;min-height:100vh}
+header{padding-top:calc(26px + env(safe-area-inset-top))}
+body{padding-top:0}
+h1{font-size:34px;letter-spacing:-1.2px}
+.sub{letter-spacing:.2px}
+.sections{position:sticky;top:env(safe-area-inset-top);z-index:5;background:rgba(24,34,58,.88);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid #2b3a5c;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.sections button.on{box-shadow:0 2px 10px rgba(242,177,52,.35)}
+.stat{text-align:center;border:1px solid #2b3a5c;background:linear-gradient(180deg,#1d2a47,#172138)}
+.stat strong{font-variant-numeric:tabular-nums}
+.stat.c0 strong{color:var(--gold)}.stat.c1 strong{color:#4fd08e}.stat.c2 strong{color:#ff7b80}
+.tabs button{transition:.15s}
+.slip{box-shadow:0 12px 30px rgba(0,0,0,.4);animation:up .4s ease both}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.top{font-weight:700;text-transform:uppercase;letter-spacing:.7px;font-size:12px;color:#51607a}
+.num{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center}
+.row .l{flex:1;min-width:0}
+.row strong{font-size:17px;line-height:1.25}
+.row small{font-size:13px}
+.cote b{font-size:26px;font-variant-numeric:tabular-nums}
+.code{background:linear-gradient(135deg,#14213d,#26407a);border:1px dashed var(--gold);box-shadow:0 4px 14px rgba(20,33,61,.35)}
+.code:active,.share:active,.tabs button:active,.sections button:active{transform:scale(.97)}
+.site{border-top:1px solid #d9e0ea;padding-top:10px}
+.msg::before{content:"🎫";display:block;font-size:36px;margin-bottom:8px}
+.warn{border-top:1px solid #26334f;padding-top:16px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -121,7 +145,6 @@ const kind = t => {
   if(y.startsWith("montan")) return "montantes";
   if(y === "nba") return "nba";
   if(y.startsWith("correct") || y.startsWith("score")) return "score";
-  if(t.palier) return "montantes";
   const ms = [], pr = [];
   for(let n = 1; n <= 20; n++){ if(t["match" + n]) ms.push(t["match" + n]); if(t["prono" + n]) pr.push(t["prono" + n]); }
   if(ms.length && ms.every(m => NBA_RE.test(m))) return "nba";
@@ -142,8 +165,8 @@ function renderStats(){
   const l = T.filter(t => t.etat === "lose").length;
   const rate = (w + l) ? Math.round(100 * w / (w + l)) + " %" : "–";
   const box = $("stats"); box.innerHTML = "";
-  [[rate, "Réussite"], [w, "Gagnés"], [l, "Perdus"], [T.length, "Tickets"]].forEach(([v, k]) => {
-    const s = el("div", "stat"); s.append(el("strong", "", v), el("span", "", k)); box.appendChild(s);
+  [[rate, "Réussite"], [w, "Gagnés"], [l, "Perdus"], [T.length, "Tickets"]].forEach(([v, k], i) => {
+    const s = el("div", "stat c" + i); s.append(el("strong", "", v), el("span", "", k)); box.appendChild(s);
   });
 }
 
@@ -198,10 +221,10 @@ function renderList(){
     const top = el("div", "top");
     top.append(el("span", "", isM(t) ? "Montante · " + (t.palier || "Cote " + (t.cote || "?")) : kind(t) === "nba" ? "NBA" : kind(t) === "score" ? "Correct score" : (ms.length > 1 ? "Combiné · " + ms.length + " matchs" : "Simple")), el("span", "badge " + t.etat, LABELS[t.etat]));
     s.appendChild(top);
-    ms.forEach(m => {
+    ms.forEach((m, i) => {
       const r = el("div", "row"), l = el("div", "l");
       l.append(el("small", "", m[0]), el("strong", "", m[1]));
-      r.appendChild(l);
+      r.append(el("span", "num", String(i + 1)), l);
       if(m[2]) r.appendChild(el("span", "score", m[2]));
       s.appendChild(r);
     });
